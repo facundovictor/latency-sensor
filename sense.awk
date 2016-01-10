@@ -1,4 +1,4 @@
-#/usr/bin/awk -f
+#!/usr/bin/awk -f
 
 # The scripts reads the ip.conf file, and for every line, it parses the follow-
 # ing fields (separated by one single space):
@@ -11,7 +11,7 @@ BEGIN {
 
 # Configurable variable definitions -------------------------------------------
 # Destination mail
-    mail_destination="sysop@bblanca.com.ar"
+    mail_destination="admin@mydomain.com"
 # Amount of echo requests
     attempts=20
 # Seconds elapsed between every echo request
@@ -78,29 +78,42 @@ BEGIN {
     close(exec_command)
 
     output=output"<tr><td>"$1"</td><td>"$2"</td><td>"host"</td><td>"transmitted"</td><td>"received"</td>"
-    if (lost > $3){
+    if (lost > $3 || lost == ""){
+        if (lost == ""){
+            lost=100
+        }
         send_email=1
         output=output"<td><b style=\"color: red;\">"lost"%</b></td>"
     } else {
         output=output"<td>"lost"%</td>"
     }
-    
-    output=output"<td>"$3"%</td><td>"min" ms</td><td>"max" ms</td>"
 
+    if (min == ""){
+        min= "&infin;"
+    }
+    if (max == ""){
+        max= "&infin;"
+    }
+
+    output=output"<td>"$3"%</td><td>"min" ms</td><td>"max" ms</td>"
     
-    if (avg > $4){
+    if (avg > $4 || avg == ""){
+        if (avg == ""){
+            avg= "&infin;"
+            mdev= "&infin;"
+        }
         send_email=1
         output=output"<td><b style=\"color: red;\">"avg" ms</b></td>"
     } else {
         output=output"<td>"avg" ms</td>"
     }
-    output=output"<td>"$4" ms</td><td>"mdev"</td></tr>"
+    output=output"<td>"$4" ms</td><td>"mdev" ms</td></tr>"
 
 }
 END {
     output=output"</tbody></table>"
         if (send_email){
-#           print output
+#            print output
             system("echo '"output"' | sendmail "mail_destination)
         }
 }
