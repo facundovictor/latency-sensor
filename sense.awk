@@ -1,90 +1,106 @@
 #/usr/bin/awk -f
 
-# El script lee el archivo de configuracion de ips, donde cada linea significa:
-# <Descripcion del host>, <IP/FQDN del host>, <Umbral de tolerancia de perdida de paquetes>, <Umbral de tolerancia de promedio de latencia>
+# The scripts reads the ip.conf file, and for every line, it parses the follow-
+# ing fields (separated by one single space):
+#     <Host description>
+#     <IP/FQDN>
+#     <Tolerance threshold of packet loss>,
+#     <Tolerance threshold of average packet latency>
 
 BEGIN {
-# mail destino
-	maildestino="sysop@bblanca.com.ar"
-# Cantidad de echo request
-	intentos=20
-# Segundos entre cada echo request
-	intervalo=1
 
-#       Se calcula la fecha y tiempo en formato dd/mm/yyyy hh:mm
-        date_command="date \"+%d/%m/%Y %H:%M\""
-        date_command | getline fecha
-        close(date_command)
+# Configurable variable definitions -------------------------------------------
+# Destination mail
+    mail_destination="sysop@bblanca.com.ar"
+# Amount of echo requests
+    attempts=20
+# Seconds elapsed between every echo request
+    interval=1
 
-#       Se comienza a armar el mail segun los valores obtenidos. El mail solo se envia en caso de valores anormales.
-	enviarmail=0
-        salida="From: ABNORMAL LATENCY <"maildestino">\n"
-        salida=salida"Subject: Latencia ANORMAL / PERDIDA de paquetes - "fecha" \n"
-        salida=salida"Content-type: text/html\n\n"
-        salida=salida"<h3>Estado de enlaces ("fecha"):</h3>\n\n"
-	salida=salida"<p>Este mail puede ser enviado por una latencia anormal, o por perdida de paquetes. La muestra es de <b>"intentos"</b> echo requests.</p>"
+# Initialization --------------------------------------------------------------
+# Calculate the date and time in 'dd/mm/yyyy hh:mm' format.
+    date_command="date \"+%d/%m/%Y %H:%M\""
+    date_command | getline date_time
+    close(date_command)
 
-	salida=salida"<table border=1><thead><tr><th>Descripcion</th><th>HOST</th><th>IP</th><th>Transmitted</th><th>Received</th><th>Packet Lost</th><th>PL Limit</th><th>Min</th><th>Max</th><th>Average</th><th>Avg Limit</th><th>Deviation</th></tr></thead><tbody>"
+# Mail content initialization. The mail will be sent only on abnormal values.
+    send_email=0
+    output="From: ABNORMAL LATENCY <"mail_destination">\n"
+    output=output"Subject: ABNORMAL latency / packet LOST - "date_time" \n"
+    output=output"Content-type: text/html\n\n"
+    output=output"<h3>Wieless link status ("date_time"):</h3>\n\n"
+    output=output"<p>This mail can be received because of an abnormal latency,\
+ or a packet lost. The experiment sample is of <b>"attempts"</b> echo requests\
+ .</p>"
+    output=output"<table border=1><thead><tr><th>Description</th><th>HOST</th>\
+    <th>IP</th><th>Transmitted</th><th>Received</th><th>Packet Lost</th>\
+    <th>PL Limit</th><th>Min</th><th>Max</th><th>Average</th>\
+    <th>Avg Limit</th><th>Deviation</th></tr></thead><tbody>"
 }
+
+# ITERATION -------------------------------------------------------------------
 {
-#10 packets transmitted, 10 received, 0% packet loss, time 8999ms
-#rtt min/avg/max/mdev = 0.035/0.046/0.083/0.015 ms
-	comando="ping -c "intentos" -i "intervalo" "$2
-	while (( comando | getline linea) > 0) {
-		split(linea,resultados,",")
-		if (resultados[1] ~ /transmitted$/){
-			split(resultados[1],cantidadT," ")
-			transmitidos=cantidadT[1]
-		}
-		if (resultados[2] ~ /received$/){
-			split(resultados[2],cantidadR," ")
-			recibidos=cantidadR[1]
-		}
-		if (resultados[3] ~ /packet loss$/){
-			split(resultados[3],cantidadPL," ")
-			perdidos=substr(cantidadPL[1],0,length(cantidadPL[1]) - 1)
-		}
+# Every executed ping will output like the following:
+#
+# 10 packets transmitted, 10 received, 0% packet loss, time 8999ms
+# rtt min/avg/max/mdev = 0.035/0.046/0.083/0.015 ms
 
-		if (linea ~ /^rtt/){
-			rtt=substr(linea,24)
-			split(rtt,estadisticas,"/")
+    exec_command="ping -c "attempts" -i "interval" "$2
+    while (( exec_command | getline line) > 0) {
+        split(line,results,",")
+        if (results[1] ~ /transmitted$/){
+            split(results[1],amount_T," ")
+            transmitted=amount_T[1]
+        }
+        if (results[2] ~ /received$/){
+            split(results[2],amount_R," ")
+            received=amount_R[1]
+        }
+        if (results[3] ~ /packet loss$/){
+            split(results[3],amount_PL," ")
+            lost=substr(amount_PL[1],0,length(amount_PL[1]) - 1)
+        }
+
+        if (line ~ /^rtt/){
+            rtt=substr(line,24)
+            split(rtt,statistics,"/")
 # min/avg/max/mdev
-			min=estadisticas[1]
-			avg=estadisticas[2]
-			max=estadisticas[3]
-			mdev=estadisticas[4]
-		}
-		if (linea ~ /^PING/){
-			split(linea,datos," ")
-			host=substr(datos[3],2,length(datos[3]) - 2)
-		} 
-	}
-	close(comando)
+            min=statistics[1]
+            avg=statistics[2]
+            max=statistics[3]
+            mdev=statistics[4]
+        }
+        if (line ~ /^PING/){
+            split(line,data," ")
+            host=substr(data[3],2,length(data[3]) - 2)
+        } 
+    }
+    close(exec_command)
 
-	salida=salida"<tr><td>"$1"</td><td>"$2"</td><td>"host"</td><td>"transmitidos"</td><td>"recibidos"</td>"
-	if (perdidos > $3){
-		enviarmail=1
-		salida=salida"<td><b style=\"color: red;\">"perdidos"%</b></td>"
-	} else {
-		salida=salida"<td>"perdidos"%</td>"
-	}
-	
-	salida=salida"<td>"$3"%</td><td>"min" ms</td><td>"max" ms</td>"
+    output=output"<tr><td>"$1"</td><td>"$2"</td><td>"host"</td><td>"transmitted"</td><td>"received"</td>"
+    if (lost > $3){
+        send_email=1
+        output=output"<td><b style=\"color: red;\">"lost"%</b></td>"
+    } else {
+        output=output"<td>"lost"%</td>"
+    }
+    
+    output=output"<td>"$3"%</td><td>"min" ms</td><td>"max" ms</td>"
 
-	
-	if (avg > $4){
-		enviarmail=1
-		salida=salida"<td><b style=\"color: red;\">"avg" ms</b></td>"
-	} else {
-		salida=salida"<td>"avg" ms</td>"
-	}
-	salida=salida"<td>"$4" ms</td><td>"mdev"</td></tr>"
+    
+    if (avg > $4){
+        send_email=1
+        output=output"<td><b style=\"color: red;\">"avg" ms</b></td>"
+    } else {
+        output=output"<td>"avg" ms</td>"
+    }
+    output=output"<td>"$4" ms</td><td>"mdev"</td></tr>"
 
 }
 END {
-	salida=salida"</tbody></table>"
-        if (enviarmail){
-#		print salida
-                system("echo '"salida"' | sendmail "maildestino)
+    output=output"</tbody></table>"
+        if (send_email){
+#           print output
+            system("echo '"output"' | sendmail "mail_destination)
         }
 }
