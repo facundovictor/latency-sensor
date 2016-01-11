@@ -20,6 +20,16 @@ Simple latency sensor, useful for remote wireless links. It parses the latency r
  
   ``` 0,15,30,45 * * * * root /opt/sense.awk /opt/ip.conf ```
 
+ 5. Configure the sense.awk script:
+ ```
+# Destination mail
+    mail_destination="admin@mydomain.com"
+# Amount of echo requests
+    attempts=20
+# Seconds elapsed between every echo request
+    interval=1
+```
+
 ## Example of an output preview:
 
 <h3>Wieless link status (10/01/2016 19:04):</h3>
