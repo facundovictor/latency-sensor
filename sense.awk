@@ -45,6 +45,17 @@ BEGIN {
 # 10 packets transmitted, 10 received, 0% packet loss, time 8999ms
 # rtt min/avg/max/mdev = 0.035/0.046/0.083/0.015 ms
 
+# First of all, let's make sure the variables are empty.
+    min=""
+    avg=""
+    max=""
+    mdev=""
+    transmitted=""
+    received=""
+    lost=""
+    host=""
+
+# Start pinging...
     exec_command="ping -c "attempts" -i "interval" "$2
     while (( exec_command | getline line) > 0) {
         split(line,results,",")
@@ -77,6 +88,7 @@ BEGIN {
     }
     close(exec_command)
 
+# Add results to the output string
     output=output"<tr><td>"$1"</td><td>"$2"</td><td>"host"</td><td>"transmitted"</td><td>"received"</td>"
     if (lost > $3 || lost == ""){
         if (lost == ""){
@@ -108,12 +120,11 @@ BEGIN {
         output=output"<td>"avg" ms</td>"
     }
     output=output"<td>"$4" ms</td><td>"mdev" ms</td></tr>"
-
 }
 END {
     output=output"</tbody></table>"
-        if (send_email){
-#            print output
-            system("echo '"output"' | sendmail "mail_destination)
-        }
+    if (send_email){
+#       print output
+        system("echo '"output"' | sendmail "mail_destination)
+    }
 }
